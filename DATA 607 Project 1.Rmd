@@ -1,0 +1,189 @@
+---
+title: "DATA 607 Project 1"
+author: "Vinicio Haro"
+date: "2/25/2018"
+output: html_document
+---
+
+The goal of this project is to take data seemingly complex and structure and to transform it into a structured data set that can be used for downstream analysis.  
+
+The raw data can be found here 
+https://raw.githubusercontent.com/vindication09/DATA607_Project1/master/RawChessData
+We will be working with an ELO chess cross table. We want to transform the information from this cross table into a data frame that contains the following information:
+player number, player name, state, total points, pre ratings, and avg opponent pre ratings.
+
+My overall strategy is to get each column as its own data frame, and then merge them into a big data frame by appending all together. 
+
+I copy and pased the data from the URL into a text editor and saved it as a .txt file. I will be reading in my data from that directory. Once it is read in, we will examine the first 10 rows to get a sense of the structure and patterns.
+```{r}
+ELOsheet <- read.csv(paste0("~/Desktop/DATA Science SPS/DATA 607/Week 3/ELOsheet.txt"))
+head(ELOsheet, 10)
+```
+
+Right away, I notice that the first two rows contain just headings. I can remove them. I will keep the line because the line appears every third row. When I do subsets later on, I can use this fact to manage my subsets. We then examine the first 10 rows and make a note of the new structure. 
+
+The lines have two rows between them. I refer to the information between lines a s asubsection. The first subsection is between rows 2 and 3. The second subsection is between rows 5 and 6. Since there is an obvious patter, I can use the sequence function to split the data into two subsets to get the information I need.
+```{r}
+ELOsheet2<-ELOsheet[-c(1:2),]
+head(ELOsheet2, 10)
+```
+
+How do I determine my subsets? 
+If I want information on the player number, name, total points, and opponents, I want to take the 2nd row of every subsection.
+
+If I want information on State, pre rating, and post rating I want the third row of each subset. 
+
+Information on sequenc could be found here 
+http://www.endmemo.com/program/R/seq.php
+
+```{r}
+#to grab the 1st row of each subsection, I want to skip the first row, grab the second, skip the third and 4th then repeat 
+ELOsubsheet1<-ELOsheet2[seq(2, length(ELOsheet2), 3)]
+head(ELOsubsheet1)
+```
+
+```{r}
+#to grab the 2nd row of each subsection, I need to skip row 1, 2 grab 3, skip 4 then repeat  
+ELOsubsheet2<-ELOsheet2[seq(3, length(ELOsheet2), 3)]
+head(ELOsubsheet2)
+```
+
+With our two subsheets created, we can use both of them to exctract the required information. We need to use our knowledge of regular expressions and the stringr library. 
+```{r}
+library(stringr)
+```
+
+
+I used the following cheet sheet to figuire out the regular expressions. It is very handy for these cases because it includes a breakdown of each pattern with description 
+http://www.cbs.dtu.dk/courses/27610/regular-expressions-cheat-sheet-v2.pdf
+
+
+Note that on some occasions, you will need to use the replace function in order to eliminate some of the "junk"
+```{r}
+#use subsheet1
+#i noticed that names are all upper case, we can use this to our advantage 
+ELOname <- unlist(str_extract_all(ELOsubsheet1, "\\| [[:upper:]- ]{4,} \\|"))
+ELOname <- str_replace_all(ELOname, pattern = "(\\| )|([[:space:]]{1,}\\|)", replacement = "")
+df.ELOname <- data.frame(ELOname)
+df.ELOname
+```
+
+```{r}
+#use subsheet 2
+#the next thing we need to extract are the States the players come from 
+#I notice that states are upper case but also have abbreviations. There is no pipe before states 
+#This is something I can use to my advantage in order to extract them. 
+ELOstate <- unlist(str_extract_all(ELOsubsheet2, "\\ [[:space:]]{1,}[[A-Z]]{2} \\|"))
+ELOstate <- str_replace_all(ELOstate, pattern = "(\\|[[:space:]]{1,})|([[:space:]]{1,}\\|)", replacement = "")
+df.ELOstate <- data.frame(ELOstate)
+df.ELOstate
+```
+
+```{r}
+#use subsheet 1
+#The next item on the list is to extract is the total number of points 
+#I noticed that points are in the form n.n. The are also between pipes
+#Lets take n.n skip the space before the righthand pipe 
+ELOtotalpoints <- unlist(str_extract_all(ELOsubsheet1, "\\|[[:digit:].[:digit:]]{3}[[:space:]]{1,}\\|"))
+ELOtotalpoints <- str_replace_all(ELOtotalpoints, pattern = "(\\|)|([[:space:]]{1,}\\|)", replacement = "")
+df.ELOtotalpoints <- data.frame(as.numeric(ELOtotalpoints))
+df.ELOtotalpoints
+```
+
+```{r}
+#use subsheet 2
+#The next item on the list that needs to be extracted is the players pre-rating 
+#the pre rating is to the right of R: and to the left of  spaces and arrow ->
+#this can be used to our advantage to extract the pre rating 
+ELOprerating <- unlist(str_extract_all(ELOsubsheet2, "[:] [[:alnum:] ]{2,9}\\-\\>"))
+ELOprerating <- str_replace_all(ELOprerating, pattern = "(\\: )|(\\s{1,}\\-\\>)|([O-Q]\\d{1,2})|(\\-\\>)", replacement = "")
+ELOprerating <- as.numeric(ELOprerating)
+df.ELOprerating<-data.frame(as.numeric(ELOprerating))
+df.ELOprerating
+```
+
+How did we do so far? Lets make a partial data frame to make sure we have collected the information in the right place using the correct data types. 
+
+```{r}
+#computing the average opponent pre rating requires more manipulation of the original data frame 
+partialcsv<-data.frame(df.ELOname, df.ELOstate, df.ELOtotalpoints, ELOprerating)
+partialcsv
+```
+
+We have 4 of the 5 columns needed. Computing the average opponent pre rating is going to be the most difficult part of this operation. 
+
+I had toyed with the idea of using melt to flatten and make 10 additional columns replacing opponent number with score and then making an 11th column for the average but I could not figure out the syntax. I also toyed with using sqldf and take advantage of the fact tha player to opponent is a one to many relationship. 
+
+I settled with trying to write a loop to compute the average pre rating, however I am eager to see if there are solutions using the methods I mentioned above. 
+
+Before writing my loop, I need information regarding the player number and the opponent number. I will use similar reg expression to extract those pieces of information. 
+
+```{r}
+#use subsheet1
+#We need to compute the average pre rating for opponents by player 
+#I first need to extract the opponents into their own data frame
+#We can extract digits using d and add + to keep going till it hits pipe
+ELOopponent<-unlist(str_extract_all(ELOsubsheet1, "\\d+\\|" ), "\\d+")
+ELOopponent<-str_replace_all(ELOopponent, pattern="\\|", replace="")
+ELOopponent<-as.integer(ELOopponent)
+df.ELOopponent<-data.frame(as.integer(ELOopponent))
+df.ELOopponent
+```
+
+```{r}
+#use subsheet 1
+#the last piece we need in order to compute the average are the player numbers
+#players are ordered 1-64. 
+ELOplayer<-as.integer(str_extract(ELOsubsheet1, "\\d+"))
+head(ELOplayer, 64)
+df.ELOplayer<-data.frame(as.integer(ELOplayer))
+df.ELOplayer
+```
+
+For player number, there was no "junk" to replace since the player number is right at the edge. 
+
+I want my loop to do the following: Scan subsheet 1 and match the player number to each of its opponents. Then to take the pre rating for each opponent and find the mean of their associated pre ratings as a single column.
+
+This is where I am stuck. My loop is not working properly as it is only taking the first opponent of each player. I would greatly appcreciate any feedback on how to best complete this portion of the project. In the meantime, I want to get more familiar with more advanced libraries that could do this more efficiently. A co-worker of mine suggested the purrr library but it is to new to me to figure out how to use it. 
+```{r}
+#use subsheet 1
+#How do we compute the average opponent player rating? 
+#the loop then fetches the ratings for each opponent and divides by number of rounds 
+avg_ELOopp_rating<-length(ELOsubsheet1)
+#loop
+for (i in 1: length(ELOsubsheet1))
+{
+  avg_ELOopp_rating[i]<-mean(ELOprerating[as.numeric(unlist(ELOopponent[ELOplayer[i]]))])
+}
+
+df.avg_ELOopp_rating<-data.frame(as.numeric(avg_ELOopp_rating))
+df.avg_ELOopp_rating
+```
+
+Proceeding with the assumption that my average was correct, we can put together our final data frame. 
+
+```{r}
+#Put together in a data frame 
+csv<-data.frame(df.ELOplayer, df.ELOname, df.ELOstate, df.ELOtotalpoints, ELOprerating, df.avg_ELOopp_rating)
+csv
+```
+
+The names do not look good. I can change them to make them more presentable and easier to understand. 
+
+```{r}
+#use a better naming convention 
+colnames(csv)[colnames(csv)=="as.integer.ELOplayer."]<-"PlayerNumber"
+colnames(csv)[colnames(csv)=="ELOname"]<-"Name"
+colnames(csv)[colnames(csv)=="ELOstate"]<-"State"
+colnames(csv)[colnames(csv)=="as.numeric.ELOtotalpoints."]<-"TotalPoints"
+colnames(csv)[colnames(csv)=="ELOprerating"]<-"PreRating"
+colnames(csv)[colnames(csv)=="as.numeric.avg_ELOopp_rating."]<-"AvgOppPreRating"
+csv
+```
+
+We finally export a new csv to a destination on your local machine. You will need to change the path. 
+```{r}
+#export to a CSV
+write.csv(csv, "~/Desktop/DATA Science SPS/DATA 607/Week 3/chesstorunament.csv")
+```
+
