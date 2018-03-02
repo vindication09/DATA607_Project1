@@ -121,8 +121,8 @@ colnames(csv)[colnames(csv)=="as.integer.ELOplayer."]<-"PlayerNumber"
 colnames(csv)[colnames(csv)=="ELOname"]<-"Name"
 colnames(csv)[colnames(csv)=="ELOstate"]<-"State"
 colnames(csv)[colnames(csv)=="as.numeric.ELOtotalpoints."]<-"TotalPoints"
-colnames(csv)[colnames(csv)=="ELOprerating"]<-"PreRating"
-colnames(csv)[colnames(csv)=="na.omit.avg_ELOopp_ratingb."]<-"AvgOppPreRating"
+colnames(csv)[colnames(csv)=="as.numeric.ELOprerating."]<-"PreRating"
+colnames(csv)[colnames(csv)=="na.omit.avg_ELOopp_rating."]<-"AvgOppPreRating"
 head(csv)
 
 #export to a CSV
