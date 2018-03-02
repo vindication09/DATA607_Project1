@@ -1,9 +1,13 @@
 #The raw data can be found here 
 #https://raw.githubusercontent.com/vindication09/DATA607_Project1/master/RawChessData
+#library(readr)
+#ELOsheet<- read_csv(paste0("C:/Users/traveler/Desktop/chess.txt"),col_names = FALSE)
+#View(ELOsheet)
+#head(ELOsheet, 10)
+ELOsheet <-read.csv(paste0("https://raw.githubusercontent.com/vindication09/DATA607_Project1/master/RawChessData"))
 
-ELOsheet <- read.csv(paste0("~/Desktop/DATA Science SPS/DATA 607/Week 3/ELOsheet.txt"))
-View(ELOsheet)
-head(ELOsheet, 10)
+head(ELOsheet)
+
 
 #goal:
 #we want to create a structured data set that can be uploaded into MySQL that contains the following columns
@@ -11,10 +15,11 @@ head(ELOsheet, 10)
 
 #Before doing anything, I notice that there are headings in the first 3 rows. Lets remove them
 ELOsheet2<-ELOsheet[-c(1:2),]
-head(ELOsheet2)
+head(ELOsheet2, 10)
 
 #we need to use the stingr package in order to massage the data and extract what we need
 library(stringr)
+library(DT)
 
 #Here we want to obtain the names of players from the score sheet 
 #I notice that there is a specific structure to each row
@@ -26,69 +31,62 @@ library(stringr)
 
 #to grab the 1st row of each subsection, I want to skip the first row, grab the second, skip the third and 4th then repeat 
 ELOsubsheet1<-ELOsheet2[seq(2, length(ELOsheet2), 3)]
-head(ELOsubsheet1, 64)
+head(ELOsubsheet1)
 
 #to grab the 2nd row of each subsection, I need to skip row 1, 2 grab 3, skip 4 then repeat 
 #to grab the 1st row of each subsection, I want to skip the first row, grab the second, skip the third and 4th then repeat 
 ELOsubsheet2<-ELOsheet2[seq(3, length(ELOsheet2), 3)]
-head(ELOsubsheet2, 64)
+head(ELOsubsheet2)
 
 #use subsheet1
 #i noticed that names are all upper case, we can use this to our advantage 
-ELOname <- unlist(str_extract_all(ELOsubsheet1, "\\| [[:upper:]- ]{4,} \\|"))
-ELOname <- str_replace_all(ELOname, pattern = "(\\| )|([[:space:]]{1,}\\|)", replacement = "")
-head(ELOname, 64)
+ELOname <- str_trim(str_extract(ELOsubsheet1, "(\\w+\\s){2,3}"))
+#ELOname <- str_replace_all(ELOname, pattern = "(\\| )|([[:space:]]{1,}\\|)", replacement = "")
 df.ELOname <- data.frame(ELOname)
-df.ELOname
+head(df.ELOname)
 
 #use subsheet 2
 #the next thing we need to extract are the States the players come from 
 #I notice that states are upper case but also have abbreviations. There is no pipe before states 
 #This is something I can use to my advantage in order to extract them. 
-ELOstate <- unlist(str_extract_all(ELOsubsheet2, "\\ [[:space:]]{1,}[[A-Z]]{2} \\|"))
-ELOstate <- str_replace_all(ELOstate, pattern = "(\\|[[:space:]]{1,})|([[:space:]]{1,}\\|)", replacement = "")
-head(ELOstate, 64)
+ELOstate <- str_extract(ELOsubsheet2, "\\w+")
+#ELOstate <- str_replace_all(ELOstate, pattern = "(\\|[[:space:]]{1,})|([[:space:]]{1,}\\|)", replacement = "")
 df.ELOstate <- data.frame(ELOstate)
-df.ELOstate
+head(df.ELOstate)
 
 #use subsheet 1
 #The next item on the list is to extract is the total number of points 
 #I noticed that points are in the form n.n. The are also between pipes
 #Lets take n.n skip the space before the righthand pipe 
-ELOtotalpoints <- unlist(str_extract_all(ELOsubsheet1, "\\|[[:digit:].[:digit:]]{3}[[:space:]]{1,}\\|"))
-ELOtotalpoints <- str_replace_all(ELOtotalpoints, pattern = "(\\|)|([[:space:]]{1,}\\|)", replacement = "")
-head(ELOtotalpoints, 64)
+ELOtotalpoints <- as.numeric(str_extract(ELOsubsheet1, "\\d+\\.\\d+"))
+#ELOtotalpoints <- str_replace_all(ELOtotalpoints, pattern = "(\\|)|([[:space:]]{1,}\\|)", replacement = "")
 df.ELOtotalpoints <- data.frame(as.numeric(ELOtotalpoints))
-df.ELOtotalpoints
+head(df.ELOtotalpoints)
 
 #use subsheet 2
 #The next item on the list that needs to be extracted is the players pre-rating 
 #the pre rating is to the right of R: and to the left of  spaces and arrow ->
 #this can be used to our advantage to extract the pre rating 
-ELOprerating <- unlist(str_extract_all(ELOsubsheet2, "[:] [[:alnum:] ]{2,9}\\-\\>"))
-ELOprerating <- str_replace_all(ELOprerating, pattern = "(\\: )|(\\s{1,}\\-\\>)|([O-Q]\\d{1,2})|(\\-\\>)", replacement = "")
+ELOprerating <- as.integer(str_extract(str_extract(ELOsubsheet2, "[^\\d]\\d{3,4}[^\\d]"), "\\d+"))
+#ELOprerating <- str_replace_all(ELOprerating, pattern = "(\\: )|(\\s{1,}\\-\\>)|([O-Q]\\d{1,2})|(\\-\\>)", replacement = "")
 ELOprerating <- as.numeric(ELOprerating)
-head(ELOprerating, 64)
 df.ELOprerating<-data.frame(as.numeric(ELOprerating))
-df.ELOprerating
+head(df.ELOprerating)
 
 #As of now, we have a partial data frame with four of the five columns
 #computing the average opponent pre rating requires more manipulation of the original data frame 
-partialcsv<-data.frame(df.ELOplayer,  df.ELOname, df.ELOstate, df.ELOtotalpoints, ELOprerating)
-partialcsv
+partialcsv<-data.frame(df.ELOname, df.ELOstate, df.ELOtotalpoints, ELOprerating)
+head(partialcsv)
 
 #use subsheet1
 #We need to compute the average pre rating for opponents by player 
 #I first need to extract the opponents into their own data frame
 #We can extract digits using d and add + to keep going till it hits pipe
-ELOopponent<-unlist(str_extract_all(ELOsubsheet1, "\\d+\\|" ), "\\d+")
-ELOopponent<-str_replace_all(ELOopponent, pattern="\\|", replace="")
-head(ELOopponent, 64)
+ELOopponent<-str_extract_all(str_extract_all(ELOsubsheet1, "\\d+\\|"), "\\d+")
+#ELOopponent<-str_replace_all(ELOopponent, pattern="\\|", replace="")
 ELOopponent<-as.integer(ELOopponent)
-df.ELOopponent<-data.frame(as.integer(ELOopponent))
-df.ELOopponent
-
-#Maybe we can flatten the opponents and make as a data frame
+df.ELOopponent<-data.frame(ELOopponent)
+head(df.ELOopponent)
 
 
 #use subsheet 1
@@ -97,26 +95,26 @@ df.ELOopponent
 #the loop then fetches the ratings for each opponent and divides by number of rounds 
 #players are ordered 1-64. 
 ELOplayer<-as.integer(str_extract(ELOsubsheet1, "\\d+"))
-head(ELOplayer, 64)
 df.ELOplayer<-data.frame(as.integer(ELOplayer))
-df.ELOplayer
+head(df.ELOplayer)
+
+
 
 #use subsheet 1
 #How do we compute the average opponent player rating? 
-avg_ELOopp_rating<-length(ELOsubsheet1)
-#loop
-for (i in 1: length(ELOsubsheet1))
-{
-  avg_ELOopp_rating[i]<-mean(ELOprerating[as.numeric(unlist(ELOopponent[ELOplayer[i]]))])
+avg_ELOopp_rating <- length(ELOsheet2)
+for (i in 1:length(ELOsheet2)) 
+{ 
+  avg_ELOopp_rating[i] <- round(mean(ELOprerating[as.numeric(unlist(ELOopponent[ELOplayer[i]]))]), digits = 0)
 }
-  
-head(avg_ELOopp_rating, 64)
-df.avg_ELOopp_rating<-data.frame(as.numeric(avg_ELOopp_rating))
-df.avg_ELOopp_rating
+head(avg_ELOopp_rating)
+
+df.avg_ELOopp_rating<-data.frame(na.omit(avg_ELOopp_ratingb))
+nrow(df.avg_ELOopp_rating)
 
 #Put together in a data frame 
-csv<-data.frame(df.ELOplayer, df.ELOname, df.ELOstate, df.ELOtotalpoints, ELOprerating, df.avg_ELOopp_rating)
-csv
+csv<-data.frame(df.ELOplayer, df.ELOname, df.ELOstate, df.ELOtotalpoints, df.ELOprerating, df.avg_ELOopp_rating)
+head(csv)
 
 #use a better naming convention 
 colnames(csv)[colnames(csv)=="as.integer.ELOplayer."]<-"PlayerNumber"
@@ -124,8 +122,8 @@ colnames(csv)[colnames(csv)=="ELOname"]<-"Name"
 colnames(csv)[colnames(csv)=="ELOstate"]<-"State"
 colnames(csv)[colnames(csv)=="as.numeric.ELOtotalpoints."]<-"TotalPoints"
 colnames(csv)[colnames(csv)=="ELOprerating"]<-"PreRating"
-colnames(csv)[colnames(csv)=="as.numeric.avg_ELOopp_rating."]<-"AvgOppPreRating"
-csv
+colnames(csv)[colnames(csv)=="na.omit.avg_ELOopp_ratingb."]<-"AvgOppPreRating"
+head(csv)
 
 #export to a CSV
-write.table(mydata, "~/Desktop/", sep=",")
+#write.table(csv, "C:/Users/traveler/Desktop/")
